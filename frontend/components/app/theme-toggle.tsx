@@ -14,44 +14,66 @@ export function ThemeToggle({ className }: ThemeToggleProps) {
   return (
     <div
       className={cn(
-        'text-foreground bg-background flex w-full flex-row justify-end divide-x overflow-hidden rounded-full border',
+        "flex overflow-hidden rounded-full border border-green-300 bg-white/80 shadow backdrop-blur-md",
         className
       )}
     >
-      <span className="sr-only">Color scheme toggle</span>
-      <button type="button" onClick={() => setTheme('dark')} className="cursor-pointer p-1 pl-1.5">
-        <span className="sr-only">Enable dark color scheme</span>
-        <MoonIcon
-          suppressHydrationWarning
-          size={16}
-          weight="bold"
-          className={cn(theme !== 'dark' && 'opacity-25')}
-        />
-      </button>
+      <span className="sr-only">Theme Toggle</span>
+
       <button
         type="button"
-        onClick={() => setTheme('light')}
-        className="cursor-pointer px-1.5 py-1"
+        onClick={() => setTheme("light")}
+        className="px-3 py-2 transition hover:bg-green-100"
       >
-        <span className="sr-only">Enable light color scheme</span>
+        <span className="sr-only">Light Theme</span>
+
         <SunIcon
           suppressHydrationWarning
-          size={16}
-          weight="bold"
-          className={cn(theme !== 'light' && 'opacity-25')}
+          size={18}
+          weight="fill"
+          className={cn(
+            theme === "light"
+              ? "text-yellow-500"
+              : "text-gray-400"
+          )}
         />
       </button>
+
       <button
         type="button"
-        onClick={() => setTheme('system')}
-        className="cursor-pointer p-1 pr-1.5"
+        onClick={() => setTheme("dark")}
+        className="border-l border-green-200 px-3 py-2 transition hover:bg-green-100"
       >
-        <span className="sr-only">Enable system color scheme</span>
+        <span className="sr-only">Dark Theme</span>
+
+        <MoonIcon
+          suppressHydrationWarning
+          size={18}
+          weight="fill"
+          className={cn(
+            theme === "dark"
+              ? "text-green-700"
+              : "text-gray-400"
+          )}
+        />
+      </button>
+
+      <button
+        type="button"
+        onClick={() => setTheme("system")}
+        className="border-l border-green-200 px-3 py-2 transition hover:bg-green-100"
+      >
+        <span className="sr-only">System Theme</span>
+
         <MonitorIcon
           suppressHydrationWarning
-          size={16}
-          weight="bold"
-          className={cn(theme !== 'system' && 'opacity-25')}
+          size={18}
+          weight="fill"
+          className={cn(
+            theme === "system"
+              ? "text-green-700"
+              : "text-gray-400"
+          )}
         />
       </button>
     </div>
