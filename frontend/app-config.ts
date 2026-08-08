@@ -33,25 +33,25 @@ export interface AppConfig {
 }
 
 export const APP_CONFIG_DEFAULTS: AppConfig = {
-  companyName: 'Murf AI',
-  pageTitle: 'Voice Agent Starter',
-  pageDescription: 'A voice agent powered by Murf Falcon — the fastest TTS API',
+  companyName: 'Krishi Mitra',
+  pageTitle: 'Krishi Mitra AI',
+  pageDescription: 'AI Voice Assistant for Indian Farmers',
 
   supportsChatInput: true,
   supportsVideoInput: true,
   supportsScreenShare: true,
   isPreConnectBufferEnabled: true,
 
-  logo: '/murf-logo.svg',
-  accent: '#6366F1',
-  logoDark: '/murf-logo-dark.svg',
-  accentDark: '#818cf8',
-  startButtonText: 'Start talking',
+  logo: '/krishi-logo.png',
+  accent: '#2E7D32',
+  logoDark: '/krishi-logo.png',
+  accentDark: '#4CAF50',
+  startButtonText: '🎤 Talk to Krishi Mitra',
 
   // optional: audio visualization configuration
-  // audioVisualizerType: 'bar',
-  // audioVisualizerColor: '#002cf2',
-  // audioVisualizerColorDark: '#1fd5f9',
+  audioVisualizerType: 'wave',
+  audioVisualizerColor: '#2E7D32',
+  audioVisualizerColorDark: '#66BB6A',
   // audioVisualizerColorShift: 0.3,
   // audioVisualizerBarCount: 5,
   // audioVisualizerType: 'radial',
@@ -61,7 +61,7 @@ export const APP_CONFIG_DEFAULTS: AppConfig = {
   // audioVisualizerGridRowCount: 25,
   // audioVisualizerGridColumnCount: 25,
   // audioVisualizerType: 'wave',
-  // audioVisualizerWaveLineWidth: 3,
+   audioVisualizerWaveLineWidth: 4,
   // audioVisualizerType: 'aura',
 
   // agent dispatch configuration
