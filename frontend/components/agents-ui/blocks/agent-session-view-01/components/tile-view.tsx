@@ -130,12 +130,12 @@ export function TileLayout({
                     ...ANIMATION_TRANSITION,
                     delay: animationDelay,
                   }}
-                  className={cn('relative aspect-square h-[90px]')}
+                  className={cn('relative aspect-square h-[280px] md:h-[340px]')}
                 >
                   <AudioVisualizer
                     key="audio-visualizer"
                     initial={{ scale: 1 }}
-                    animate={{ scale: chatOpen ? 0.2 : 1 }}
+                    animate={{ scale: chatOpen ? 0.45 : 1 }}
                     transition={{
                       ...ANIMATION_TRANSITION,
                       delay: animationDelay,
@@ -151,10 +151,11 @@ export function TileLayout({
                     audioVisualizerWaveLineWidth={audioVisualizerWaveLineWidth}
                     isChatOpen={chatOpen}
                     className={cn(
-                      'absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2',
-                      'bg-background rounded-[50px] border border-transparent transition-[border,drop-shadow]',
-                      chatOpen && 'border-input shadow-2xl/10 delay-200'
-                    )}
+                      'absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2',
+                      'bg-background rounded-full p-8 shadow-2xl border border-green-200',
+                      'transition-all duration-300',
+                      chatOpen && 'border-green-500 shadow-green-500/20'
+                      )}
                     style={{ color: audioVisualizerColor }}
                   />
                 </motion.div>
@@ -190,14 +191,15 @@ export function TileLayout({
                   }}
                   className={cn(
                     'overflow-hidden bg-black drop-shadow-xl/80',
-                    chatOpen ? 'h-[90px]' : 'h-auto w-full'
+                    chatOpen  ? 'h-[180px] w-[180px] rounded-full'  : 'h-[340px] w-[340px] rounded-full'
                   )}
                 >
                   <VideoTrack
                     width={videoWidth}
                     height={videoHeight}
                     trackRef={agentVideoTrack}
-                    className={cn(chatOpen && 'size-[90px] object-cover')}
+                    className={cn(  chatOpen    ? 'size-[180px] object-cover rounded-full'    : 'size-[340px] object-cover rounded-full'
+                    )}
                   />
                 </motion.div>
               )}
