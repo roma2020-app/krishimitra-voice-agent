@@ -18,6 +18,7 @@ from livekit.agents import (
 from livekit.plugins import murf, silero, google, deepgram, noise_cancellation
 from livekit.plugins.turn_detector.multilingual import MultilingualModel
 from memory.database import get_farmer, init_db, save_farmer
+from tools.weather_tool import get_weather
 
 logger = logging.getLogger("agent")
 
@@ -44,6 +45,37 @@ You know:
 - General farming practices
 
 If you do not know something or do not have current information, clearly say so.
+
+WEATHER TOOL RULES
+
+When the farmer asks about current weather, today's weather,
+temperature, rain, rainfall, humidity, or wind, ALWAYS use the
+lookup_weather tool.
+
+If the farmer has already told you their district and that district
+is available from lookup_farmer, use that district automatically.
+
+Do not ask the farmer for their district again when it is already
+available in their saved profile.
+
+Use the live weather tool result to answer.
+
+Never invent current weather information.
+
+If the weather tool fails, clearly tell the farmer that current
+weather information is temporarily unavailable.
+
+Do not read technical JSON, field names, or tool details aloud.
+
+Mention that the information is based on the latest available
+weather data and include the data time when useful.
+
+When using the weather tool, always mention when the weather
+data was retrieved or the latest available data time.
+
+For example:
+"नवीनतम उपलब्ध मौसम डेटा के अनुसार, आज सुबह 9 बजे पुणे में
+तापमान लगभग 23 डिग्री सेल्सियस है।"
 
 LANGUAGE AND SCRIPT RULES
 
@@ -297,7 +329,59 @@ Never save OTP, PIN, password, bank account number or other sensitive financial 
     #     logger.info(f"Looking up weather for {location}")
     #
     #     return "sunny with a temperature of 70 degrees."
+    @function_tool
+    async def lookup_weather(
+        self,
+        context: RunContext,
+        location: str,
+    ) -> str:
+        """
+        Get current real-time weather information for a city or district.
 
+        Use this tool whenever the farmer asks about current weather,
+        today's temperature, rain, rainfall, humidity, wind,
+        or current weather conditions.
+
+        The data comes from a live weather service.
+
+        Do not use this tool for general farming advice that does
+        not require current weather information.
+
+        Never invent current weather information if this tool fails.
+
+        Args:
+            location: City or district name, for example Nashik or Pune.
+        """
+
+        logger.info(
+            "Looking up live weather for location=%s",
+            location,
+        )
+
+        result = get_weather(location)
+
+        if not result.get("success"):
+            logger.warning(
+                "Weather lookup failed for location=%s: %s",
+                location,
+                result.get("message"),
+            )
+
+            return str({
+                "success": False,
+                "message": result.get(
+                    "message",
+                    "Weather information is temporarily unavailable.",
+                ),
+            })
+
+        logger.info(
+            "Weather lookup successful: location=%s temperature=%s",
+            location,
+            result.get("temperature"),
+        )
+
+        return str(result)
 
 server = AgentServer()
 
@@ -325,7 +409,7 @@ async def my_agent(ctx: JobContext):
     session = AgentSession(
         # Speech-to-text (STT) is your agent's ears, turning the user's speech into text that the LLM can understand
         # See all available models at https://docs.livekit.io/agents/models/stt/
-        stt=deepgram.STT(model="nova-3",language="multi"),
+        stt=deepgram.STT(model="nova-3",language="multi",smart_format=True,endpointing_ms=100,),
         # A Large Language Model (LLM) is your agent's brain, processing user input and generating a response
         # See all available models at https://docs.livekit.io/agents/models/llm/
         llm=google.LLM(
