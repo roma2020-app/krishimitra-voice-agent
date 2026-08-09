@@ -7,7 +7,6 @@ conversation.
 The project is being developed as part of **10 Days of Voice Agents –
 VoiceForBharat Edition**.
 
-## Day 5 – Tools
 
 ### Live Weather Lookup Tool
 
