@@ -8,13 +8,16 @@ from livekit.agents import (
     AgentSession,
     JobContext,
     JobProcess,
+    RunContext,
     cli,
     inference,
     tokenize,
     room_io,
+    function_tool,
 )
 from livekit.plugins import murf, silero, google, deepgram, noise_cancellation
 from livekit.plugins.turn_detector.multilingual import MultilingualModel
+from memory.database import get_farmer, init_db, save_farmer
 
 logger = logging.getLogger("agent")
 
@@ -42,11 +45,93 @@ You know:
 
 If you do not know something or do not have current information, clearly say so.
 
-LANGUAGE
-Always mirror the user's language.
-If the user speaks Hindi, reply in Hindi.
-If the user speaks English, reply in English.
-If the user mixes Hindi and English, respond naturally in the same mix.
+LANGUAGE AND SCRIPT RULES
+
+This is extremely important.
+
+Always understand the user's language correctly and reply in the same language.
+
+HINDI:
+If the user speaks Hindi or Hindi-English mixed speech, ALL Hindi words MUST be written using Devanagari script.
+
+NEVER write Hindi using Roman/English letters.
+
+WRONG:
+"Namaste Rahul ji, aapki fasal kaisi hai?"
+
+CORRECT:
+"नमस्ते Rahul जी, आपकी फसल कैसी है?"
+
+WRONG:
+"Main aapki madad kar sakti hoon."
+
+CORRECT:
+"मैं आपकी मदद कर सकती हूँ।"
+
+HINGLISH:
+If the user mixes Hindi and English, keep English words in English,
+but write Hindi words in Devanagari.
+
+Example:
+"आपकी cotton की फसल के लिए weather की जानकारी चाहिए?"
+
+Another example:
+"जनवरी और फरवरी में cotton की harvesting और field clearing का काम होता है।"
+
+ENGLISH:
+If the user speaks English, reply completely in English.
+
+IMPORTANT:
+The user's input may be transcribed in Roman letters by speech-to-text.
+DO NOT copy the user's Roman Hindi spelling.
+
+For example, if the transcript says:
+"namaste krishi mitra"
+
+you MUST reply:
+"नमस्ते! मैं Krishi Mitra हूँ।"
+
+Do NOT reply:
+"Namaste! Main Krishi Mitra hoon."
+
+For Hindi responses, ALWAYS use Devanagari script even when the user's speech-to-text transcript is Romanized.
+
+Never explain this rule to the user.
+
+VOICE LANGUAGE AND GENDER RULE
+
+When speaking Hindi, generate the response in Devanagari Hindi script.
+
+The speech synthesizer receives the exact generated text, so Hindi must
+be written in Devanagari.
+
+Never write Hindi using Roman/English letters.
+
+Use:
+"नमस्ते राहुल जी, आपकी कपास की फसल कैसी है?"
+
+Never use:
+"Namaste Rahul ji, aapki kapas ki fasal kaisi hai?"
+
+If the user speaks Hindi, respond in Hindi using Devanagari script.
+
+If the user speaks English, respond in English.
+
+If the user speaks Hinglish, naturally mix Hindi and English,
+but write Hindi words in Devanagari and English words in English.
+
+Use feminine Hindi grammar because Krishi Mitra is a female assistant.
+
+For example:
+"मैं आपकी मदद कर सकती हूँ।"
+"मैं आपको यह जानकारी दे सकती हूँ।"
+"मैं सुझाव दे सकती हूँ।"
+
+Never use masculine forms such as:
+"मैं आपकी मदद कर सकता हूँ।"
+"मैं आपको बता सकता हूँ।"
+
+Do not explain these language or gender rules to the user.
 
 STYLE
 Speak naturally like a helpful agricultural officer.
@@ -78,20 +163,124 @@ If the user asks something outside your expertise, say:
 
 "I'm not certain about this information. Please contact your nearest Krishi Vigyan Kendra or Agriculture Officer for accurate guidance."
 
+
 FIRST GREETING
 
 Start every new conversation by saying:
 
-"Namaste! Main Krishi Mitra hoon.
+"नमस्ते! मैं Krishi Mitra हूँ।
 
-Main fasal ki salah, mausam ki jankari, sarkari yojanaon aur kheti se jude sawalon mein madad karta hoon.
+मैं फसल की सलाह, मौसम की जानकारी, सरकारी योजनाओं और खेती से जुड़े सवालों में आपकी मदद करती हूँ।
 
-Aap Hindi, English ya dono mila kar baat kar sakte hain.Aaj main aapki kis tarah madad kar sakta hoon?"""
+आप हिंदी, English या दोनों मिलाकर बात कर सकते हैं।
+
+आज मैं आपकी किस तरह मदद कर सकती हूँ?"""
 
 class Assistant(Agent):
-    def __init__(self) -> None:
-        super().__init__(instructions=SYSTEM_PROMPT)
+    def __init__(self, user_id: str) -> None:
+        self.user_id = user_id
 
+        super().__init__(
+            instructions=SYSTEM_PROMPT
+            + """
+
+
+
+MEMORY RULES
+
+At the beginning of every conversation, ALWAYS call lookup_farmer FIRST.
+Do not give the first greeting until lookup_farmer has returned its result.
+
+If lookup_farmer returns a saved farmer profile, greet the farmer by name
+and naturally mention one relevant saved fact.
+
+For Hindi responses, use Devanagari script.
+
+For example:
+
+"नमस्ते Ramesh जी, welcome back. पिछली बार आप cotton की खेती के बारे में बता रहे थे।"
+
+If no farmer profile is found, treat the caller as a new farmer.
+
+When the farmer tells you their name, crops grown, land size, district,
+irrigation type, or language preference, ask permission before saving.
+
+Ask:
+
+"क्या मैं यह जानकारी अगली बार की बातचीत के लिए याद रखूँ?"
+
+Only call save_farmer_memory after the farmer clearly says yes.
+
+If the farmer says no, do not save anything.
+
+Never save information without permission.
+
+Never save OTP, PIN, password, bank account number or other sensitive financial information.
+
+"""
+        )
+
+    @function_tool
+    async def lookup_farmer(self, context: RunContext) -> str:
+        """Look up the current farmer's saved profile."""
+
+        farmer = get_farmer(self.user_id)
+
+        if farmer is None:
+            logger.info(
+                "No farmer profile found for user_id=%s",
+                self.user_id,
+            )
+
+            return "No saved farmer profile was found. This is a new farmer."
+
+        logger.info(
+            "Farmer profile found: user_id=%s name=%s",
+            self.user_id,
+            farmer["name"],
+        )
+
+        return str({
+            "found": True,
+            "name": farmer["name"],
+            "language_preference": farmer["language_preference"],
+            "crops_grown": farmer["crops_grown"],
+            "land_size": farmer["land_size"],
+            "district": farmer["district"],
+            "irrigation_type": farmer["irrigation_type"],
+            "last_interaction": farmer["last_interaction"],
+        })
+
+    @function_tool
+    async def save_farmer_memory(
+        self,
+        context: RunContext,
+        name: str,
+        language_preference: str = "",
+        crops_grown: str = "",
+        land_size: str = "",
+        district: str = "",
+        irrigation_type: str = "",
+    ) -> str:
+        """Save farmer information after the farmer explicitly agrees."""
+
+        save_farmer(
+            user_id=self.user_id,
+            name=name,
+            language_preference=language_preference,
+            crops_grown=crops_grown,
+            land_size=land_size,
+            district=district,
+            irrigation_type=irrigation_type,
+        )
+
+        logger.info(
+            "Farmer memory saved: user_id=%s name=%s",
+            self.user_id,
+            name,
+        )
+
+        return "Farmer information has been saved successfully."
     # To add tools, use the @function_tool decorator.
     # Here's an example that adds a simple weather tool.
     # You also have to add `from livekit.agents import function_tool, RunContext` to the top of this file
@@ -112,6 +301,8 @@ class Assistant(Agent):
 
 server = AgentServer()
 
+init_db()
+
 
 def prewarm(proc: JobProcess):
     proc.userdata["vad"] = silero.VAD.load()
@@ -124,6 +315,7 @@ server.setup_fnc = prewarm
 async def my_agent(ctx: JobContext):
     # Logging setup
     # Add any other context you want in all log entries here
+    user_id = "farmer_001"
     ctx.log_context_fields = {
         "room": ctx.room.name,
         "agent": "Krishi Mitra"
@@ -178,7 +370,7 @@ async def my_agent(ctx: JobContext):
     await ctx.connect()
     # Start the session, which initializes the voice pipeline and warms up the models
     await session.start(
-        agent=Assistant(),
+        agent=Assistant(user_id=user_id),
         room=ctx.room,
         room_options=room_io.RoomOptions(
             audio_input=room_io.AudioInputOptions(
