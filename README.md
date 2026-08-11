@@ -185,7 +185,7 @@ Saved one record:
     "last_interaction": "2026-08-11T12:23:39"
 }
 
-#Day4 Demo
+# Day 4 – Demo
 First Conversation:
 Farmer
 मेरा नाम Ravi है।
@@ -214,7 +214,7 @@ Krishi Mitra:
 
 बताइए, आज मैं आपकी कैसे मदद करूँ?
 
-# Day 5 – The Tools
+# Day 5– Tools
 On Day 5, Krishi Mitra was connected to a real-world weather data source.
 
 Until Day 4, Krishi Mitra could:
@@ -380,7 +380,7 @@ The following Day 5 requirements have been tested:
 - [x] API failure path tested
 - [x] Agent does not hallucinate weather when API is unavailable
 
-## Day 5 Demo
+# Day 5 –Demo
 
 Example successful interaction:
 
@@ -400,6 +400,7 @@ Krishi Mitra:
 "मौसम सेवा अभी अस्थायी रूप से उपलब्ध नहीं है। कृपया थोड़ी देर बाद
 फिर से प्रयास करें।"
 
+
 # Day 6 – Krishi Mitra Outbound Calls
 
 ## Farm & Field – Proactive Weather Alert
@@ -418,7 +419,7 @@ The outbound call uses:
 - Murf AI TTS
 - Hindi and English voice interaction
 
-# Day6 Demo:
+# Day 6 – Krishi Mitra Outbound Calls:Demo
 After phone answering Agent asks:
 नमस्ते Ravi जी!
 
@@ -488,6 +489,7 @@ Example response:
 आपका दिन शुभ हो।
 
 The LiveKit session is then closed.
+
 
 ## Challenge
 
