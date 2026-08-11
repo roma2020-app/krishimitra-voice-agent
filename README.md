@@ -184,6 +184,7 @@ Saved one record:
     "irrigation_type": "Canal",
     "last_interaction": "2026-08-11T12:23:39"
 }
+--
 
 # Day 4 – Demo
 First Conversation:
@@ -213,6 +214,7 @@ Krishi Mitra:
 गेहूं की खेती करते हैं।
 
 बताइए, आज मैं आपकी कैसे मदद करूँ?
+--
 
 # Day 5– Tools
 On Day 5, Krishi Mitra was connected to a real-world weather data source.
@@ -367,6 +369,7 @@ Google Gemini
 Murf Falcon TTS
     ↓
 Natural Voice Response
+--
 
 ## Day 5 Validation
 
@@ -419,6 +422,7 @@ The outbound call uses:
 - Murf AI TTS
 - Hindi and English voice interaction
 
+-- 
 # Day 6 – Krishi Mitra Outbound Calls:Demo
 After phone answering Agent asks:
 नमस्ते Ravi जी!
