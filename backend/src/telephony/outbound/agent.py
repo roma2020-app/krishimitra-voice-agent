@@ -1,5 +1,4 @@
-
-"""Krishi Mitra outbound telephony agent."""
+"""Krishi Mitra personalized outbound telephony agent."""
 
 import asyncio
 import json
@@ -37,12 +36,6 @@ from livekit.plugins.turn_detector.multilingual import MultilingualModel
 # ============================================================
 # PATH SETUP
 # ============================================================
-
-# This allows:
-# uv run python src/telephony/outbound/agent.py dev
-#
-# to import:
-# src.tools.weather_tool
 
 BACKEND_DIR = os.path.abspath(
     os.path.join(os.path.dirname(__file__), "../../..")
@@ -92,6 +85,8 @@ OUTBOUND_TRUNK_ID = os.getenv(
     "LIVEKIT_SIP_OUTBOUND_TRUNK_ID"
 )
 
+CALLEE_IDENTITY = "krishi-farmer"
+
 logger.info(
     "Outbound SIP trunk configured: %s",
     bool(OUTBOUND_TRUNK_ID),
@@ -99,7 +94,7 @@ logger.info(
 
 
 # ============================================================
-# KRISHI MITRA SYSTEM PROMPT
+# BASE KRISHI MITRA SYSTEM PROMPT
 # ============================================================
 
 SYSTEM_PROMPT = """
@@ -142,14 +137,52 @@ Never use Roman Hindi.
 
 WEATHER:
 
+WEATHER:
+
 If the farmer asks about current weather, today's weather,
-temperature, rain, rainfall, humidity, wind, or tomorrow's weather,
-use the weather tool.
+tomorrow's weather, future weather, temperature, rain,
+rainfall, humidity, wind, or rain probability, use the
+weather tool.
 
-Never invent live weather information.
+IMPORTANT:
 
-If the weather tool fails, clearly tell the farmer that
-live weather information is temporarily unavailable.
+The weather tool returns:
+
+"current" = current weather
+
+"tomorrow" = tomorrow's forecast
+
+If the farmer asks about tomorrow, ALWAYS use the
+"tomorrow" values.
+
+For example, if the tool returns:
+
+tomorrow:
+temperature minimum = 25.1°C
+temperature maximum = 32.4°C
+rain probability = 94%
+rainfall = 15.9 mm
+
+and the farmer asks:
+
+"कल का weather कैसा रहेगा?"
+
+You should answer using those values.
+
+Do NOT say:
+"मैं कल का मौसम नहीं बता सकती।"
+
+Do NOT say tomorrow's weather is unavailable when
+the weather tool has returned tomorrow's data.
+
+For a Hindi response, say naturally:
+
+"कल तापमान लगभग 25 से 32 डिग्री रहेगा और बारिश की
+संभावना 94 प्रतिशत है। लगभग 15.9 मिलीमीटर बारिश
+होने का अनुमान है।"
+
+Never invent weather information.
+Only use values returned by the weather tool.
 
 OUTBOUND PURPOSE:
 
@@ -168,35 +201,65 @@ detected_answering_machine tool.
 
 
 # ============================================================
-# OUTBOUND GREETING
-# ============================================================
-
-GREETING = (
-    "नमस्ते! मैं Krishi Mitra हूँ। "
-    "मैं आपके खेत के मौसम की महत्वपूर्ण जानकारी देने के लिए "
-    "कॉल कर रही हूँ। अगर आप यह कॉल नहीं चाहते हैं, तो कह सकते हैं "
-    "'कॉल बंद करें'।"
-
-    #“नमस्ते! मैं Krishi Mitra हूँ। मैं आपको बारिश की महत्वपूर्ण चेतावनी देने के लिए कॉल कर रही हूँ। आपके क्षेत्र में बारिश की संभावना अधिक है, इसलिए कृपया खेत में जरूरी तैयारी कर लें। अगर आप यह कॉल नहीं चाहते हैं, तो कह सकते हैं ‘कॉल बंद करें’।”
-)
-
-
-CALLEE_IDENTITY = "phone-user"
-
-
-# ============================================================
 # OUTBOUND AGENT
 # ============================================================
 
 class OutboundAgent(Agent):
 
-    def __init__(self, ctx: JobContext) -> None:
-
-        super().__init__(
-            instructions=SYSTEM_PROMPT
-        )
+    def __init__(
+        self,
+        ctx: JobContext,
+        farmer: dict | None = None,
+    ) -> None:
 
         self.ctx = ctx
+        self.farmer = farmer or {}
+
+        farmer_name = self.farmer.get(
+            "name",
+            "किसान जी",
+        )
+
+        crop = self.farmer.get(
+            "crop",
+            "",
+        )
+
+        district = self.farmer.get(
+            "district",
+            "",
+        )
+
+        language = self.farmer.get(
+            "language",
+            "hi",
+        )
+
+        farmer_context = f"""
+
+FARMER PROFILE FOR THIS CALL:
+
+Farmer name: {farmer_name}
+Preferred language: {language}
+Crop grown: {crop}
+District: {district}
+Land size: {self.farmer.get("land_size", "")}
+Irrigation type: {self.farmer.get("irrigation_type", "")}
+
+PERSONALIZATION RULES:
+
+1. Address the farmer by their name when appropriate.
+2. Use the farmer's crop when discussing farming advice.
+3. Use the farmer's district for weather context.
+4. Do not repeatedly mention personal information.
+5. Never reveal that the information came from a database.
+6. Never invent farmer information.
+7. If information is missing, simply avoid mentioning it.
+"""
+
+        super().__init__(
+            instructions=SYSTEM_PROMPT + farmer_context
+        )
 
     # ========================================================
     # WEATHER TOOL
@@ -209,7 +272,25 @@ class OutboundAgent(Agent):
         city: str,
     ) -> str:
         """
-        Get current real-time weather for a city or district.
+        Get current and forecast weather for a city or district.
+        Use this tool whenever the farmer asks about:
+        - current weather
+        - today's weather
+        - tomorrow's weather
+        - future weather
+        - rain
+        - rainfall
+        - temperature
+        - humidity
+        - wind
+        - tomorrow's rain probability
+        IMPORTANT:
+        The tool returns TWO sections:
+        1. "current" = current weather
+        2. "tomorrow" = tomorrow's forecast
+        When the farmer asks about tomorrow, you MUST use the
+        values inside the "tomorrow" section.
+        Do NOT say that tomorrow's weather is unavailable if the tool returns a "tomorrow" section.
         """
 
         if not WEATHER_TOOL_AVAILABLE or get_weather is None:
@@ -235,10 +316,6 @@ class OutboundAgent(Agent):
         )
 
         try:
-
-            # get_weather uses requests, so run it in a
-            # background thread instead of blocking the
-            # async voice pipeline.
 
             result = await asyncio.to_thread(
                 get_weather,
@@ -296,9 +373,6 @@ class OutboundAgent(Agent):
                     "Do not ask another question."
                 )
             )
-
-            # Give Murf enough time to finish the goodbye
-            # before deleting the LiveKit room.
 
             await asyncio.sleep(2.0)
 
@@ -387,27 +461,34 @@ server.setup_fnc = prewarm
 
 
 # ============================================================
-# GET PHONE NUMBER FROM DISPATCH METADATA
+# GET CALL METADATA
 # ============================================================
 
-def phone_number_from_metadata(
+def metadata_from_context(
     ctx: JobContext,
-) -> str | None:
+) -> dict:
 
     metadata = ctx.job.metadata
 
     if not metadata:
-        return None
+        return {}
 
     try:
 
         data = json.loads(metadata)
 
-        return data.get("phone_number")
+        if isinstance(data, dict):
+            return data
+
+        return {}
 
     except json.JSONDecodeError:
 
-        return metadata.strip() or None
+        logger.warning(
+            "Could not parse job metadata as JSON."
+        )
+
+        return {}
 
 
 # ============================================================
@@ -432,14 +513,10 @@ def normalize_sip_destination(
 
     destination = destination.strip()
 
-    # Remove sip:
     if destination.lower().startswith("sip:"):
-
         destination = destination[4:]
 
-    # Remove domain
     if "@" in destination:
-
         destination = destination.split(
             "@",
             1,
@@ -465,10 +542,61 @@ async def outbound_agent(
     }
 
     # --------------------------------------------------------
-    # GET DESTINATION
+    # GET METADATA
     # --------------------------------------------------------
 
-    phone_number = phone_number_from_metadata(ctx)
+    metadata = metadata_from_context(ctx)
+
+    phone_number = metadata.get(
+        "phone_number"
+    )
+
+    farmer = {
+        "user_id": metadata.get(
+            "farmer_id",
+            "",
+        ),
+        "name": metadata.get(
+            "farmer_name",
+            "",
+        ),
+        "language": metadata.get(
+            "language",
+            "hi",
+        ),
+        "crop": metadata.get(
+            "crop",
+            "",
+        ),
+        "district": metadata.get(
+            "district",
+            "",
+        ),
+        "land_size": metadata.get(
+            "land_size",
+            "",
+        ),
+        "irrigation_type": metadata.get(
+            "irrigation_type",
+            "",
+        ),
+    }
+
+    # --------------------------------------------------------
+    # LOG FARMER INFORMATION
+    # --------------------------------------------------------
+
+    logger.info(
+        "Outbound farmer: id=%s name=%s crop=%s district=%s",
+        farmer["user_id"],
+        farmer["name"],
+        farmer["crop"],
+        farmer["district"],
+    )
+
+    # --------------------------------------------------------
+    # CHECK DESTINATION
+    # --------------------------------------------------------
 
     if not phone_number:
 
@@ -571,7 +699,10 @@ async def outbound_agent(
 
         session.start(
 
-            agent=OutboundAgent(ctx),
+            agent=OutboundAgent(
+                ctx,
+                farmer,
+            ),
 
             room=ctx.room,
 
@@ -623,8 +754,7 @@ async def outbound_agent(
                     sip_trunk_id=OUTBOUND_TRUNK_ID,
 
                     # IMPORTANT:
-                    # Use normalized SIP USER, NOT:
-                    # sip:username@sip.linphone.org
+                    # Use normalized SIP USER
                     sip_call_to=sip_destination,
 
                     participant_identity=CALLEE_IDENTITY,
@@ -698,17 +828,89 @@ async def outbound_agent(
         return
 
     # --------------------------------------------------------
-    # FIRST WORDS THE FARMER HEARS
+    # PERSONALIZED GREETING
+    # --------------------------------------------------------
+
+    farmer_name = farmer.get(
+        "name"
+    ) or "किसान जी"
+
+    crop = farmer.get(
+        "crop"
+    )
+
+    district = farmer.get(
+        "district"
+    )
+
+    if crop and district:
+
+        #greeting = (
+        #    f"नमस्ते {farmer_name} जी! "
+        #    f"मैं Krishi Mitra हूँ। "
+        #    f"आपकी {crop} की फसल के लिए "
+        #    f"{district} क्षेत्र में मौसम की महत्वपूर्ण "
+        #    f"जानकारी देने के लिए कॉल कर रही हूँ। "
+        #   f"अगर आप यह कॉल नहीं चाहते हैं, "
+        #   f"तो कह सकते हैं 'कॉल बंद करें'।"
+        #)
+
+        greeting = (
+            f"नमस्ते {farmer_name} जी! "
+            f"मैं Krishi Mitra हूँ। "
+            f"आपकी {crop} की फसल के लिए एक महत्वपूर्ण "
+            f"बारिश की चेतावनी देने के लिए कॉल कर रही हूँ। "
+            f"कल {district} में बारिश की संभावना बहुत अधिक है। "
+            f"कृपया अपनी फसल के लिए आवश्यक सावधानी रखें। "
+            f"अगर आप यह कॉल नहीं चाहते हैं, "
+            f"तो कह सकते हैं 'कॉल बंद करें'।"
+)
+
+    elif crop:
+
+        greeting = (
+            f"नमस्ते {farmer_name} जी! "
+            f"मैं Krishi Mitra हूँ। "
+            f"आपकी {crop} की फसल के लिए मौसम की "
+            f"महत्वपूर्ण जानकारी देने के लिए कॉल कर रही हूँ। "
+            f"अगर आप यह कॉल नहीं चाहते हैं, "
+            f"तो कह सकते हैं 'कॉल बंद करें'।"
+        )
+
+    else:
+
+        greeting = (
+            f"नमस्ते {farmer_name} जी! "
+            f"मैं Krishi Mitra हूँ। "
+            f"मैं आपके खेत के मौसम की महत्वपूर्ण "
+            f"जानकारी देने के लिए कॉल कर रही हूँ। "
+            f"अगर आप यह कॉल नहीं चाहते हैं, "
+            f"तो कह सकते हैं 'कॉल बंद करें'।"
+        )
+
+    # --------------------------------------------------------
+    # LOG GREETING
     # --------------------------------------------------------
 
     logger.info(
-        "Call answered. Starting Krishi Mitra greeting."
+        "Call answered. Starting personalized Krishi Mitra greeting."
     )
+
+    logger.info(
+        "Greeting farmer=%s crop=%s district=%s",
+        farmer_name,
+        crop,
+        district,
+    )
+
+    # --------------------------------------------------------
+    # SPEAK GREETING
+    # --------------------------------------------------------
 
     try:
 
         await session.say(
-            GREETING,
+            greeting,
             allow_interruptions=True,
         )
 
