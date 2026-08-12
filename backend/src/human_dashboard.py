@@ -1,157 +1,62 @@
-"""Human help / escalation tool for Krishi Mitra Day 7."""
+import streamlit as st
 
-import sqlite3
-import uuid
-from datetime import datetime
-from pathlib import Path
+from tools.escalation_tool import get_open_escalations
 
-
-# Same database used by database.py
-DB_PATH = (
-    Path(__file__).resolve().parents[2]
-    / "krishi_mitra.db"
+st.set_page_config(
+    page_title="Krishi Mitra Human Help",
+    page_icon="🌾",
+    layout="wide",
 )
 
+st.title("🌾 Krishi Mitra - Human Help Dashboard")
 
-def get_connection():
-    return sqlite3.connect(DB_PATH)
+try:
+    escalations = get_open_escalations()
 
+    if not escalations:
+        st.info("No open human-help requests.")
+    else:
+        st.success(f"{len(escalations)} open request(s)")
 
-def init_escalation_db():
-    """Create the human-help request table."""
+        for row in escalations:
+            (
+                reference_id,
+                farmer_name,
+                district,
+                crop,
+                reason,
+                what_happened,
+                agent_checked,
+                urgency,
+                language,
+                preferred_follow_up,
+                status,
+                created_at,
+            ) = row
 
-    conn = get_connection()
+            with st.container():
+                st.subheader(f"🆔 {reference_id}")
 
-    conn.execute(
-        """
-        CREATE TABLE IF NOT EXISTS escalation_requests (
-            reference_id TEXT PRIMARY KEY,
-            user_id TEXT,
-            farmer_name TEXT,
-            district TEXT,
-            crop TEXT,
-            reason TEXT,
-            what_happened TEXT,
-            agent_checked TEXT,
-            urgency TEXT,
-            language TEXT,
-            preferred_follow_up TEXT,
-            status TEXT,
-            created_at TEXT
-        )
-        """
-    )
+                col1, col2, col3 = st.columns(3)
 
-    conn.commit()
-    conn.close()
+                with col1:
+                    st.write(f"**Farmer:** {farmer_name}")
+                    st.write(f"**District:** {district}")
+                    st.write(f"**Crop:** {crop}")
 
+                with col2:
+                    st.write(f"**Urgency:** {urgency}")
+                    st.write(f"**Language:** {language}")
+                    st.write(f"**Follow-up:** {preferred_follow_up}")
 
-def create_escalation(
-    user_id: str,
-    farmer_name: str,
-    district: str,
-    crop: str,
-    reason: str,
-    what_happened: str,
-    agent_checked: str,
-    urgency: str,
-    language: str,
-    preferred_follow_up: str,
-) -> dict:
-    """
-    Create a human-help request.
+                with col3:
+                    st.write(f"**Status:** {status}")
+                    st.write(f"**Created:** {created_at}")
 
-    Only call this after the farmer explicitly gives
-    permission to share the information.
-    """
+                st.write(f"**Reason:** {reason}")
+                st.write(f"**What happened:** {what_happened}")
 
-    init_escalation_db()
+                st.divider()
 
-    reference_id = (
-        "KM-"
-        + uuid.uuid4().hex[:8].upper()
-    )
-
-    created_at = datetime.now().isoformat()
-
-    conn = get_connection()
-
-    conn.execute(
-        """
-        INSERT INTO escalation_requests (
-            reference_id,
-            user_id,
-            farmer_name,
-            district,
-            crop,
-            reason,
-            what_happened,
-            agent_checked,
-            urgency,
-            language,
-            preferred_follow_up,
-            status,
-            created_at
-        )
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-        """,
-        (
-            reference_id,
-            user_id,
-            farmer_name,
-            district,
-            crop,
-            reason,
-            what_happened,
-            agent_checked,
-            urgency,
-            language,
-            preferred_follow_up,
-            "OPEN",
-            created_at,
-        ),
-    )
-
-    conn.commit()
-    conn.close()
-
-    return {
-        "success": True,
-        "reference_id": reference_id,
-        "status": "OPEN",
-    }
-
-
-def get_open_escalations():
-    """Get all unresolved human-help requests."""
-
-    init_escalation_db()
-
-    conn = get_connection()
-
-    cursor = conn.execute(
-        """
-        SELECT
-            reference_id,
-            farmer_name,
-            district,
-            crop,
-            reason,
-            what_happened,
-            agent_checked,
-            urgency,
-            language,
-            preferred_follow_up,
-            status,
-            created_at
-        FROM escalation_requests
-        WHERE status != 'RESOLVED'
-        ORDER BY created_at DESC
-        """
-    )
-
-    rows = cursor.fetchall()
-
-    conn.close()
-
-    return rows
+except Exception as e:
+    st.error(f"Dashboard error: {e}")
