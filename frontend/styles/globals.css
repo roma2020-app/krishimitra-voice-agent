@@ -206,3 +206,30 @@
     opacity: .6;
   }
 }
+
+.dashboard-button {
+  min-width: 220px;
+  height: 48px;
+  padding: 0 24px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  box-sizing: border-box;
+
+  border: 2px solid #008f3c;
+  border-radius: 24px;
+  background: white;
+  color: #006b2d;
+
+  font-size: 16px;
+  font-weight: 600;
+  text-decoration: none;
+  cursor: pointer;
+
+  transition: all 0.2s ease;
+}
+
+.dashboard-button:hover {
+  background: #eafff1;
+  transform: translateY(-1px);
+}
