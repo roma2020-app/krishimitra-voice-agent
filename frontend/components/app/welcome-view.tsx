@@ -85,6 +85,10 @@ export const WelcomeView = ({
           {startButtonText}
         </Button>
 
+        <a href="http://localhost:8501" target="_blank" rel="noopener noreferrer"className="dashboard-button">
+              👨‍🌾 Human Help Dashboard
+               </a>
+
       </div>
 
       <p className="mt-8 rounded-full bg-black/40 px-5 py-2 text-sm text-white">
