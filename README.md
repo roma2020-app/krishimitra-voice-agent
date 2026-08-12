@@ -495,6 +495,50 @@ Example response:
 The LiveKit session is then closed.
 
 
+#Day7 Know When to Ask for Human Help
+🌱 Serious Crop Problem → Human Expert
+
+When a farmer reports a serious crop disease or damage, Krishi Mitra can recognize that expert help is needed instead of giving an uncertain diagnosis.
+
+It can escalate the request to a human agriculture expert.
+
+🔐 Permission First
+
+Before sharing farmer information, Krishi Mitra asks for permission.
+
+The farmer can say हाँ, and only then is the escalation request created.
+
+🧠 Farmer Memory
+
+The system uses the farmer's saved information such as:
+
+Name
+
+District
+
+Crop
+
+Language preference
+
+🎫 Human Escalation
+
+The request receives a reference ID:
+
+KM-E8D30098
+
+with an OPEN status for human follow-up.
+
+🖥️ Human Help Dashboard
+
+I also created a simple dashboard where the human expert can see the open request and the useful information needed to handle it.
+
+The complete flow
+
+Farmer reports problem → AI identifies need for human help → asks permission → creates escalation → generates reference ID → human sees the request
+
+
+
+
 ## Challenge
 
 This project is being developed as part of:
