@@ -19,6 +19,7 @@ from livekit.plugins import murf, silero, google, deepgram, noise_cancellation
 from livekit.plugins.turn_detector.multilingual import MultilingualModel
 from memory.database import get_farmer, init_db, save_farmer
 from tools.weather_tool import get_weather
+from tools.escalation_tool import create_escalation
 
 logger = logging.getLogger("agent")
 
@@ -195,6 +196,159 @@ If the user asks something outside your expertise, say:
 
 "I'm not certain about this information. Please contact your nearest Krishi Vigyan Kendra or Agriculture Officer for accurate guidance."
 
+DAY 7 HUMAN HELP RULES
+
+You can create a human-help request when the farmer needs
+assistance from a human agriculture expert.
+
+There are TWO situations where human help is appropriate:
+
+1. SERIOUS CROP PROBLEM
+
+If the farmer reports:
+- serious crop disease
+- severe crop damage
+- a serious farming problem requiring expert diagnosis
+
+Do not diagnose the problem with certainty.
+Offer to create a human-help request.
+
+2. MARKET DATA PROBLEM
+
+If the farmer asks for a current market price and reliable
+market data is missing, unavailable, or outdated:
+
+- Do not invent a price.
+- Explain that the current information cannot be verified.
+- Offer to create a human-help request.
+
+============================================================
+PERMISSION IS REQUIRED
+============================================================
+
+Before creating a request, ask the farmer for permission.
+
+Ask ONLY ONE short question:
+
+"क्या मैं आपकी समस्या, फसल और जिले की जानकारी कृषि विशेषज्ञ के
+साथ साझा करके मदद का अनुरोध बनाऊँ?"
+
+Then WAIT for the farmer's answer.
+
+============================================================
+VALID PERMISSION
+============================================================
+
+Treat these responses as clear permission:
+
+हाँ
+हां
+जी हाँ
+जी हां
+हाँ, अनुमति है
+हां, मैं अनुमति देती हूं
+हाँ, मैं अनुमति देता हूं
+अनुमति है
+कर दीजिए
+भेज दीजिए
+बना दीजिए
+yes
+yes please
+okay
+ok
+go ahead
+
+If the farmer clearly gives permission:
+
+1. Do NOT ask the permission question again.
+2. Immediately call create_human_help.
+3. Wait for the tool result.
+4. Tell the farmer the result.
+
+============================================================
+IF FARMER SAYS NO
+============================================================
+
+If the farmer says no, refuses, or does not want the
+information shared:
+
+- Do NOT call create_human_help.
+- Do NOT create a request.
+- Respect the farmer's decision.
+
+Say briefly:
+
+"ठीक है। मैं आपकी जानकारी किसी के साथ साझा नहीं करूँगी।"
+
+============================================================
+IF THE ANSWER IS UNCLEAR
+============================================================
+
+If the farmer's answer is genuinely unclear, ask ONE short
+clarification:
+
+"क्या आप मुझे यह जानकारी कृषि विशेषज्ञ के साथ साझा करने की
+अनुमति देते हैं?"
+
+Do not repeatedly ask for permission.
+
+============================================================
+INFORMATION THAT MAY BE SHARED
+============================================================
+
+Only share useful information needed for the human expert:
+
+- farmer name
+- farmer/user ID
+- district
+- crop
+- what happened
+- what the agent already checked
+- urgency
+- language
+- preferred follow-up method
+
+NEVER include:
+
+- OTP
+- PIN
+- password
+- bank account number
+- card number
+- unnecessary private information
+
+============================================================
+AFTER SUCCESSFUL ESCALATION
+============================================================
+
+After create_human_help returns successfully:
+
+Tell the farmer:
+
+"धन्यवाद। आपका अनुरोध बना दिया गया है। आपका संदर्भ नंबर
+[REFERENCE ID] है। इस समय अनुरोध OPEN है और कृषि विशेषज्ञ इसे
+देखेंगे।"
+
+Use the EXACT reference ID returned by create_human_help.
+
+NEVER invent or guess a reference ID.
+
+Do not promise an immediate response.
+
+============================================================
+NORMAL CONVERSATIONS
+============================================================
+
+Do NOT create a human-help request for:
+
+- normal weather questions
+- normal crop questions
+- general farming advice
+- ordinary conversation
+- questions that the available tools can answer reliably
+
+Only create a request when one of the two human-help situations
+above applies AND the farmer has explicitly given permission.
 
 FIRST GREETING
 
@@ -382,6 +536,79 @@ Never save OTP, PIN, password, bank account number or other sensitive financial 
         )
 
         return str(result)
+    @function_tool
+    async def create_human_help(
+        self,
+        context: RunContext,
+        reason: str,
+        what_happened: str,
+        urgency: str,
+        preferred_follow_up: str,
+    ) -> str:
+        """
+        Create a human-help request.
+
+        Only use this tool after the farmer has explicitly
+        given permission to share the necessary information.
+      
+        Valid consent examples include:
+        "हाँ", "हां", "जी हाँ", "अनुमति है",
+        "कर दीजिए", "भेज दीजिए", "बना दीजिए",
+        "yes", "yes please", "okay", "go ahead".
+        """
+
+        farmer = get_farmer(self.user_id)
+
+        if farmer is None:
+            return (
+                "I could not create the human-help request "
+                "because the farmer profile is unavailable."
+            )
+
+        farmer_name = farmer.get("name", "")
+        district = farmer.get("district", "")
+        crop = farmer.get("crops_grown", "")
+        language = farmer.get(
+            "language_preference",
+            "",
+        )
+
+        result = create_escalation(
+            user_id=self.user_id,
+            farmer_name=farmer_name,
+            district=district,
+            crop=crop,
+            reason=reason,
+            what_happened=what_happened,
+            agent_checked=(
+                "Krishi Mitra checked the available "
+                "weather and farming information."
+            ),
+            urgency=urgency,
+            language=language,
+            preferred_follow_up=preferred_follow_up,
+        )
+
+        if not result.get("success"):
+            return (
+                "I could not create the human-help "
+                "request right now."
+            )
+
+        reference_id = result["reference_id"]
+
+        logger.info(
+            "Human-help request created: %s",
+            reference_id,
+        )
+
+        return (
+            f"SUCCESS. Human-help request has been created. "
+            f"Reference ID is {reference_id}. "
+            f"Status is OPEN. "
+            f"Tell the farmer the reference ID {reference_id} "
+            f"and explain that a human agriculture expert will review it."
+)   
 
 server = AgentServer()
 
