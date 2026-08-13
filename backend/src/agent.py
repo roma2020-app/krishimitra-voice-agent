@@ -20,6 +20,7 @@ from livekit.plugins.turn_detector.multilingual import MultilingualModel
 from memory.database import get_farmer, init_db, save_farmer
 from tools.weather_tool import get_weather
 from tools.escalation_tool import create_escalation
+from analytics.call_analytics import start_call, end_call
 
 logger = logging.getLogger("agent")
 
@@ -366,6 +367,11 @@ class Assistant(Agent):
     def __init__(self, user_id: str) -> None:
         self.user_id = user_id
 
+
+         # Day 8 call analytics
+        self.call_success = False
+        self.success_reason = ""
+
         super().__init__(
             instructions=SYSTEM_PROMPT
             + """
@@ -535,6 +541,10 @@ Never save OTP, PIN, password, bank account number or other sensitive financial 
             result.get("temperature"),
         )
 
+        # Day 8: successful task
+        self.call_success = True
+        self.success_reason = "Weather information provided"
+
         return str(result)
     @function_tool
     async def create_human_help(
@@ -602,6 +612,10 @@ Never save OTP, PIN, password, bank account number or other sensitive financial 
             reference_id,
         )
 
+        # Day 8: successful task
+        self.call_success = True
+        self.success_reason = "Human-help request successfully created"
+
         return (
             f"SUCCESS. Human-help request has been created. "
             f"Reference ID is {reference_id}. "
@@ -627,6 +641,13 @@ async def my_agent(ctx: JobContext):
     # Logging setup
     # Add any other context you want in all log entries here
     user_id = "farmer_001"
+
+    # Day 8: record the start of the real browser call
+    call_id = start_call("browser")
+
+    logger.info(
+        "Day 8 analytics: browser call started: %s",
+        call_id,)
     ctx.log_context_fields = {
         "room": ctx.room.name,
         "agent": "Krishi Mitra"
@@ -672,16 +693,44 @@ async def my_agent(ctx: JobContext):
     # # Add a virtual avatar to the session, if desired
     # # For other providers, see https://docs.livekit.io/agents/models/avatar/
     # avatar = hedra.AvatarSession(
-    #   avatar_id="...",  # See https://docs.livekit.io/agents/models/avatar/plugins/hedra
-    # )
-    # # Start the avatar and wait for it to join
-    # await avatar.start(session, room=ctx.room)
-
-     # Join the room and connect to the user
+    #   avatar_id="...",  # See https://docs.livekit.io/age    # Join the room and connect to the user
     await ctx.connect()
-    # Start the session, which initializes the voice pipeline and warms up the models
+
+    # Create the assistant so we can track the success state of this call.
+    assistant = Assistant(user_id=user_id)
+
+    # Day 8: save the final outcome when the session closes.
+    @session.on("close")
+    def on_session_close(event):
+        if assistant.call_success:
+            outcome = "SUCCESS"
+            success_reason = assistant.success_reason
+        else:
+            outcome = "FAILED"
+            success_reason = "Requested task was not completed"
+
+        try:
+            end_call(
+                call_id,
+                outcome,
+                success_reason,
+            )
+
+            logger.info(
+                "Day 8 analytics: call=%s outcome=%s reason=%s",
+                call_id,
+                outcome,
+                success_reason,
+            )
+
+        except Exception:
+            logger.exception(
+                "Day 8 analytics: failed to save call outcome"
+            )
+
+    # Start the session, which initializes the voice pipeline and warms up the models.
     await session.start(
-        agent=Assistant(user_id=user_id),
+        agent=assistant,
         room=ctx.room,
         room_options=room_io.RoomOptions(
             audio_input=room_io.AudioInputOptions(
