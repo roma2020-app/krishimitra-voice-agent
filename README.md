@@ -537,7 +537,45 @@ The complete flow
 Farmer reports problem → AI identifies need for human help → asks permission → creates escalation → generates reference ID → human sees the request
 
 
+Day 8 – Build a Call Analytics Dashboard
+A Streamlit-based monitoring dashboard has been implemented for Krishi Mitra to provide real-time visibility into voice-agent performance and human-help escalations.
 
+The dashboard loads call information from the live call analytics database and displays the overall number of calls, successful calls, failed calls, and calculated success rate. It also provides a channel-wise breakdown of agent activity, separately tracking Browser Calls and SIP Outbound Calls, including total, successful, and failed calls for each channel.
+
+In addition to call analytics, the dashboard includes a Human Help monitoring section. It retrieves open escalation requests and displays the number of open requests along with high- and medium-priority requests. Each escalation is presented as a detailed request card containing the farmer name, district, crop, reason for escalation, what happened during the interaction, what Krishi Mitra already checked, urgency, language, preferred follow-up method, status, and creation time.
+
+A Refresh button allows the dashboard to reload the latest information from the database, ensuring that the displayed metrics reflect newly completed calls and newly created human-help requests.
+
+Dashboard Flow
+Browser Voice Call ──┐
+                     │
+                     ├──> Call Analytics Database ──> Streamlit Dashboard
+SIP Outbound Call ───┘                                  │
+                                                        ├── Total Calls
+                                                        ├── Successful Calls
+                                                        ├── Failed Calls
+                                                        ├── Success Rate
+                                                        ├── Browser Metrics
+                                                        └── SIP Metrics
+
+Voice Agent ──> Human Escalation ──> Escalation Database ──> Human Help Dashboard
+                                                              │
+                                                              ├── Open Requests
+                                                              ├── High Priority
+                                                              ├── Medium Priority
+                                                              └── Detailed Farmer Request
+What Has Been Demonstrated
+Live call analytics loaded from the database
+Total / successful / failed call tracking
+Overall success-rate calculation
+Browser vs SIP channel analytics
+Human-help escalation monitoring
+Priority-based escalation counts
+Detailed farmer escalation information
+Manual dashboard refresh
+No hardcoded call statistics
+
+Provided a single dashboard to monitor both voice-agent call performance and human-in-the-loop support activity.
 
 ## Challenge
 
