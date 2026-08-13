@@ -49,6 +49,9 @@ if BACKEND_DIR not in sys.path:
 # WEATHER TOOL
 # ============================================================
 
+from src.analytics.call_analytics import start_call, end_call
+
+
 try:
     from src.tools.weather_tool import get_weather
 
@@ -214,6 +217,10 @@ class OutboundAgent(Agent):
 
         self.ctx = ctx
         self.farmer = farmer or {}
+
+        # Day 8 call analytics
+        self.call_success = False
+        self.success_reason = ""
 
         farmer_name = self.farmer.get(
             "name",
@@ -651,6 +658,46 @@ async def outbound_agent(
     )
 
     # --------------------------------------------------------
+    # DAY 8 — START CALL ANALYTICS
+    # --------------------------------------------------------
+
+    call_id = start_call("sip")
+
+    logger.info(
+        "Day 8 analytics: outbound SIP call started: %s",
+        call_id,
+    )
+
+    analytics_saved = False
+
+    def save_call_outcome(outcome: str, reason: str) -> None:
+        nonlocal analytics_saved
+
+        if analytics_saved:
+            return
+
+        try:
+            end_call(
+                call_id,
+                outcome,
+                reason,
+            )
+
+            analytics_saved = True
+
+            logger.info(
+                "Day 8 analytics: call=%s outcome=%s reason=%s",
+                call_id,
+                outcome,
+                reason,
+            )
+
+        except Exception:
+            logger.exception(
+                "Day 8 analytics: failed to save call outcome"
+            )
+
+    # --------------------------------------------------------
     # CONNECT TO LIVEKIT
     # --------------------------------------------------------
 
@@ -695,31 +742,38 @@ async def outbound_agent(
     # START VOICE SESSION
     # --------------------------------------------------------
 
+    outbound_agent_instance = OutboundAgent(
+        ctx,
+        farmer,
+    )
+
+    @session.on("close")
+    def on_session_close(event):
+        if outbound_agent_instance.call_success:
+            save_call_outcome(
+                "SUCCESS",
+                outbound_agent_instance.success_reason
+                or "Outbound weather alert delivered",
+            )
+        else:
+            save_call_outcome(
+                "FAILED",
+                "Outbound call ended before the weather alert was delivered",
+            )
+
     session_started = asyncio.create_task(
-
         session.start(
-
-            agent=OutboundAgent(
-                ctx,
-                farmer,
-            ),
-
+            agent=outbound_agent_instance,
             room=ctx.room,
-
             room_options=room_io.RoomOptions(
-
                 audio_input=room_io.AudioInputOptions(
-
                     noise_cancellation=lambda params: (
-
                         noise_cancellation.BVCTelephony()
-
                         if (
                             params.participant
                             and params.participant.kind
                             == rtc.ParticipantKind.PARTICIPANT_KIND_SIP
                         )
-
                         else noise_cancellation.BVC()
                     )
                 )
@@ -781,6 +835,11 @@ async def outbound_agent(
             getattr(e, "metadata", None),
         )
 
+        save_call_outcome(
+            "FAILED",
+            "SIP call could not be established",
+        )
+
         session_started.cancel()
 
         ctx.shutdown()
@@ -792,6 +851,11 @@ async def outbound_agent(
         logger.exception(
             "UNEXPECTED OUTBOUND CALL ERROR: %s",
             e,
+        )
+
+        save_call_outcome(
+            "FAILED",
+            "Unexpected outbound call error",
         )
 
         session_started.cancel()
@@ -821,6 +885,11 @@ async def outbound_agent(
         logger.exception(
             "VOICE SESSION FAILED: %s",
             e,
+        )
+
+        save_call_outcome(
+            "FAILED",
+            "Voice session failed before the call was completed",
         )
 
         ctx.shutdown()
@@ -914,11 +983,34 @@ async def outbound_agent(
             allow_interruptions=True,
         )
 
+        # Day 8: the farmer has received the outbound weather alert.
+        outbound_agent_instance.call_success = True
+        outbound_agent_instance.success_reason = (
+            "Outbound weather alert delivered"
+        )
+
+        logger.info(
+            "Day 8 analytics: outbound call marked SUCCESS"
+        )
+
+        # Save SUCCESS immediately.
+        # Do not rely only on the LiveKit "close" event because
+        # the outbound call may delete/shutdown the room.
+        save_call_outcome(
+            "SUCCESS",
+            "Outbound weather alert delivered",
+        )
+
     except Exception as e:
 
         logger.exception(
             "Failed to play greeting: %s",
             e,
+        )
+
+        save_call_outcome(
+            "FAILED",
+            "Outbound greeting could not be delivered",
         )
 
         ctx.shutdown()
