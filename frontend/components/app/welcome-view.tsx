@@ -86,7 +86,7 @@ export const WelcomeView = ({
         </Button>
 
         <a href="http://localhost:8501" target="_blank" rel="noopener noreferrer"className="dashboard-button">
-              👨‍🌾 Human Help Dashboard
+              👨‍🌾 Dashboard
                </a>
 
       </div>
