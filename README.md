@@ -577,6 +577,12 @@ No hardcoded call statistics
 
 Provided a single dashboard to monitor both voice-agent call performance and human-in-the-loop support activity.
 
+
+## Day 9 – Hand Off to a Specialist Agent
+
+On Day 9, **Krishi Mitra** was upgraded with a dedicated **Crop Problem Specialist** that takes over when a farmer needs focused crop-health assistance. The specialist receives the existing conversation context so the farmer does not need to repeat the problem, and when additional support is required, it can use the existing **Human Help escalation system** to create a request for an agriculture expert and display it on the Human Help Dashboard.
+
+
 ## Challenge
 
 This project is being developed as part of:
