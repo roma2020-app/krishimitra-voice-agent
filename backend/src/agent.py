@@ -21,6 +21,7 @@ from memory.database import get_farmer, init_db, save_farmer
 from tools.weather_tool import get_weather
 from tools.escalation_tool import create_escalation
 from analytics.call_analytics import start_call, end_call
+from crop_specialist import CropProblemSpecialist
 
 logger = logging.getLogger("agent")
 
@@ -337,6 +338,23 @@ NEVER invent or guess a reference ID.
 Do not promise an immediate response.
 
 ============================================================
+
+DAY 9 CROP PROBLEM SPECIALIST
+
+If the farmer asks for help with a specific crop problem, especially symptoms such as
+yellowing leaves, spots, pests, visible damage, possible disease, or another problem
+that needs focused crop troubleshooting, use the handoff_to_crop_specialist tool.
+
+The crop specialist has one focused job: help the farmer understand and troubleshoot
+crop problems without claiming a certain diagnosis or prescribing pesticide dosages.
+
+Before handing off, clearly tell the farmer that you are connecting them to the Crop
+Problem Specialist. Then use the handoff tool. Do not make the farmer repeat the
+problem; the specialist receives the existing conversation context.
+
+Do NOT hand off normal weather questions, general farming advice, or requests that
+you can reliably answer with the existing tools.
+
 NORMAL CONVERSATIONS
 ============================================================
 
@@ -623,6 +641,54 @@ Never save OTP, PIN, password, bank account number or other sensitive financial 
             f"Tell the farmer the reference ID {reference_id} "
             f"and explain that a human agriculture expert will review it."
 )   
+
+    def _mark_call_success(self, reason: str) -> None:
+        """Allow the Day 9 specialist to mark the same call as successful."""
+        self.call_success = True
+        self.success_reason = reason
+
+    @function_tool
+    async def handoff_to_crop_specialist(
+        self,
+        context: RunContext,
+        reason: str,
+    ):
+        """
+        Transfer the farmer to the Crop Problem Specialist when a crop problem
+        needs focused troubleshooting.
+
+        Use this for crop symptoms, suspected disease, pests, yellowing leaves,
+        spots, severe crop damage, or other crop-specific problems that need a
+        specialist. Do not use this for normal weather or general farming advice.
+
+        Args:
+            reason: Brief description of the crop problem requiring specialist help.
+        """
+        logger.info(
+            "Day 9: handing off farmer user_id=%s to crop specialist: %s",
+            self.user_id,
+            reason,
+        )
+
+        # Tell the farmer before control is transferred.
+        await self.session.generate_reply(
+            instructions=(
+                "Tell the farmer briefly in the current conversation language: "
+                "I am connecting you to our Crop Problem Specialist. "
+                "Do not diagnose the crop problem in this message. "
+                "Keep it to one short sentence."
+            )
+        )
+
+        # Preserve the conversation so the farmer does not need to repeat the problem.
+        specialist = CropProblemSpecialist(
+            user_id=self.user_id,
+            chat_ctx=self.chat_ctx.copy(exclude_instructions=True),
+            mark_call_success=self._mark_call_success,
+        )
+
+        return specialist, "Transferring to Crop Problem Specialist"
+
 
 server = AgentServer()
 
