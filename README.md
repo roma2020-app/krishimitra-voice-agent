@@ -665,12 +665,16 @@ Provided a single dashboard to monitor both voice-agent call performance and hum
 On Day 9, **Krishi Mitra** was upgraded with a dedicated **Crop Problem Specialist** that takes over when a farmer needs focused crop-health assistance. The specialist receives the existing conversation context so the farmer does not need to repeat the problem, and when additional support is required, it can use the existing **Human Help escalation system** to create a request for an agriculture expert and display it on the Human Help Dashboard.
 
 ---
+
+
 # Day 10 - Shared blog post
 
 Tech Blog:
 https://dev.to/roma_gupta_750b944d80482e/building-krishi-mitra-an-ai-voice-agent-for-indian-farmers-with-livekit-gemini-and-murf-falcon-1ng1
 
 ---
+
+
 # Challenge
 #Murf AI
 This project is being developed as part of:
